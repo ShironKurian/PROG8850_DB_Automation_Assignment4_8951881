@@ -1,0 +1,78 @@
+---
+- name: Start and Initialize MySQL, then Apply Migrations
+  hosts: localhost
+  become: yes
+  vars:
+    ansible_python_interpreter: /usr/local/python/3.12.1/bin/python3  # Use the Python where your modules are installed
+
+  pre_tasks:
+    - name: Ensure PyMySQL is installed and set as MySQLdb
+      shell: python3 -c "import pymysql; pymysql.install_as_MySQLdb()"
+      changed_when: false
+
+  tasks:
+    - name: Ensure MySQL is installed
+      apt:
+        name: mysql-server
+        state: present
+      tags: mysql
+
+    - name: Start MySQL service
+      service:
+        name: mysql
+        state: started
+        enabled: yes
+      tags: mysql
+
+    - name: Wait for MySQL socket to be available
+      wait_for:
+        path: /var/run/mysqld/mysqld.sock
+        state: present
+        timeout: 30
+      tags: mysql
+
+    - name: Initialize database for Flyway
+      mysql_db:
+        name: subscribers_db
+        state: present
+        login_user: root
+        login_password: password
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      tags: db_init
+
+    - name: Create Flyway schema history table if not exists
+      mysql_db:
+        name: subscribers_db
+        state: present
+        login_user: root
+        login_password: password
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        encoding: utf8mb4
+      tags: db_init
+
+    - name: Ensure Flyway is installed and available
+      command: flyway -version
+      register: flyway_version
+      ignore_errors: yes
+      tags: migration
+
+    - name: Install Flyway if not installed
+      apt:
+        name: flyway
+        state: present
+      when: flyway_version.rc != 0
+      tags: migration
+
+    - name: Run Flyway migrations
+      command: flyway migrate -url=jdbc:mysql://localhost:3306/subscribers_db -user=root -password=password
+      tags: migration
+
+    - name: Verify Flyway migrations applied successfully
+      command: flyway info -url=jdbc:mysql://localhost:3306/subscribers_db -user=root -password=password
+      register: flyway_info
+      tags: migration
+
+    - name: Display Flyway info
+      debug:
+        var: flyway_info.stdout_lines
+      tags: migration

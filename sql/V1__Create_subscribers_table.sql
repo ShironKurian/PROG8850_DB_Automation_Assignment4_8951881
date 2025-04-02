@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS subscribers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255),
+    email VARCHAR(255),
+    subscription_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

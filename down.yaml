@@ -1,0 +1,15 @@
+---
+- name: Create Migration and Stop MySQL
+  hosts: localhost
+  become: yes
+  tasks:
+    - name: Create a migration for new data (simulate data backup)
+      shell: |
+        mysqldump -u root -ppassword subscribers_db > /tmp/subscribers_backup.sql
+      tags: backup
+
+    - name: Stop MySQL service
+      service:
+        name: mysql
+        state: stopped
+      tags: mysql
